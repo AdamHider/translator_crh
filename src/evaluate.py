@@ -1,5 +1,5 @@
 import torch
-from .dataset import get_sp
+from .dataset import Dataset
 from .transformer import device
 
 def evaluate(transformer, english, english_mask, max_len):
@@ -7,9 +7,10 @@ def evaluate(transformer, english, english_mask, max_len):
     Performs Greedy Decoding with a batch size of 1
     """
     transformer.eval()
-    sp = get_sp()
-    start_token = sp.bos_id()
-    end_token = sp.eos_id()
+    ds = Dataset()
+    processor = ds.get_processor()
+    start_token = processor.bos_id()
+    end_token = processor.eos_id()
     encoded = transformer.encode(english, english_mask)
     words = torch.LongTensor([[start_token]]).to(device)
     
@@ -32,7 +33,7 @@ def evaluate(transformer, english, english_mask, max_len):
         
     sen_idx = [w for w in words if w not in {start_token}]
     
-    sentence = sp.decode_ids(sen_idx)
+    sentence = processor.decode_ids(sen_idx)
     
     return sentence
      

@@ -1,6 +1,6 @@
-from src.dataset import create_dataset
-from src.train import train
-from src.predict import predict
+from src.dataset import Dataset
+from src.trainer import Trainer
+from src.predictor import Predictor
 
 
 fields = ["predict", "train", "create_dataset"]
@@ -15,14 +15,21 @@ while(1) :
         action = fields[int(action_index) - 1]
         match action:
             case "predict":
-                predict()
+                pr = Predictor()
+                while(1):
+                    text = input("English: ") 
+                    if text == 'quit':
+                        break
+                    prediction = pr.predict(text)
+                    print(prediction+'\n')
             case "train":
-                train()
+                tr = Trainer()
+                tr.train()
             case "create_dataset":
-                create_dataset()
+                ds = Dataset()
+                ds.build()
             case _:
                 print("There is no such action")
     else :
         print("Please, enter a valid number")
-
 

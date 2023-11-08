@@ -9,6 +9,14 @@ def get_conf(section, key) :
     config = configparser.ConfigParser()
     config.read("./config.ini")
     try:
-        return config[section][key]
+        return  config.get(section, key)
+    except:
+        return 0
+
+def get_int(section, key) : 
+    config = configparser.ConfigParser()
+    config.read("./config.ini")
+    try:
+        return config.getint(section, key)
     except:
         return 0

@@ -135,11 +135,10 @@ class DecoderLayer(nn.Module):
 
 class Transformer(nn.Module):
     
-    def __init__(self, d_model, heads, num_layers):
+    def __init__(self, d_model, heads, num_layers, vocab_size):
         super(Transformer, self).__init__()
-        
         self.d_model = d_model
-        self.vocab_size = 10000
+        self.vocab_size = vocab_size
         self.embed = Embeddings(self.vocab_size, d_model)
         self.encoder = nn.ModuleList([EncoderLayer(d_model, heads) for _ in range(num_layers)])
         self.decoder = nn.ModuleList([DecoderLayer(d_model, heads) for _ in range(num_layers)])
@@ -166,16 +165,15 @@ class Transformer(nn.Module):
 
 class AdamWarmup:
     
-    def __init__(self, model_size, warmup, optimizer):
-        
+    def __init__(self, model_size, warmup_steps, optimizer):
         self.model_size = model_size
-        self.warmup = warmup
+        self.warmup_steps = warmup_steps
         self.optimizer = optimizer
         self.current_step = 0
         self.lr = 0
         
     def get_lr(self):
-        return self.model_size ** (-0.5) * min(self.current_step ** (-0.5), self.current_step * self.warmup ** (-1.5))
+        return self.model_size ** (-0.5) * min(self.current_step ** (-0.5), self.current_step * self.warmup_steps ** (-1.5))
         
     def step(self):
         # Increment the number of steps each time we call the step function
@@ -192,7 +190,7 @@ class LossWithLS(nn.Module):
 
     def __init__(self, size, smooth):
         super(LossWithLS, self).__init__()
-        self.criterion = nn.KLDivLoss(size_average=False, reduce=False)
+        self.criterion = nn.KLDivLoss(reduction='none')
         self.confidence = 1.0 - smooth
         self.smooth = smooth
         self.size = size
@@ -216,7 +214,7 @@ class LossWithLS(nn.Module):
 
 class TransformerBuilder: 
     def __init__(self, d_model, heads, num_layers, vocab_size):
-        self.transformer = Transformer(d_model = d_model, heads = heads, num_layers = num_layers)
+        self.transformer = Transformer(d_model = d_model, heads = heads, num_layers = num_layers, vocab_size = vocab_size)
         self.transformer = self.transformer.to(device)
         self.adam_optimizer = torch.optim.Adam(self.transformer.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9)
         self.transformer_optimizer = AdamWarmup(model_size = d_model, warmup_steps = 4000, optimizer = self.adam_optimizer)
