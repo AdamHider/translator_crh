@@ -13,7 +13,7 @@ def evaluate(transformer, english, english_mask, max_len):
     end_token = processor.eos_id()
     encoded = transformer.encode(english, english_mask)
     words = torch.LongTensor([[start_token]]).to(device)
-    
+        
     for step in range(max_len - 1):
         size = words.shape[1]
         target_mask = torch.triu(torch.ones(size, size)).transpose(0, 1).type(dtype=torch.uint8)

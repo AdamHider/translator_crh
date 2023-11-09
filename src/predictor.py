@@ -9,15 +9,16 @@ class Predictor :
     
     def __init__(self):
         path = get_conf("path", "training")
-        epochs = get_int("training", "epochs")
-        #checkpoint = torch.load(f"{path}/checkpoint_{str(epochs-1)}.pth.tar")
-        #self.transformer = checkpoint['transformer']
 
     def predict(self, input) : 
-            return 'Welcome'
-            ds = Dataset()
-            processor = ds.get_processor()
-            input = ds.encode_source(input, processor)
-            input = torch.LongTensor(input).to(device).unsqueeze(0)
-            input_mask = (input!=0).to(device).unsqueeze(1).unsqueeze(1)  
-            return evaluate(self.transformer, input, input_mask, int(40))
+        path = get_conf("path", "training")
+        epochs = get_int("training", "epochs")
+        checkpoint = torch.load(f"{path}/checkpoint_{str(epochs-1)}.pth.tar")
+        transformer = checkpoint['transformer']
+
+        ds = Dataset()
+        processor = ds.get_processor()
+        english = ds.encode_source(input, processor)
+        english = torch.LongTensor(english).to(device).unsqueeze(0)
+        english_mask = (english!=0).to(device).unsqueeze(1).unsqueeze(1)  
+        return evaluate(transformer, english, english_mask, int(40))
