@@ -1,9 +1,11 @@
-from src.dataset import Dataset
+import sys
+sys.path.insert(0, './src/')
+
 from src.trainer import Trainer
 from src.predictor import Predictor
 
 
-fields = ["predict", "train", "create_dataset"]
+fields = ["predict", "train"]
 for i, field in enumerate(fields):
     print(f"Line {i+1}: {field}")
 
@@ -23,13 +25,10 @@ while(1) :
                     prediction = pr.predict(text)
                     print(prediction+'\n')
             case "train":
+                print('train')
                 tr = Trainer()
                 tr.train()
-            case "create_dataset":
-                ds = Dataset()
-                ds.build()
             case _:
                 print("There is no such action")
     else :
         print("Please, enter a valid number")
-

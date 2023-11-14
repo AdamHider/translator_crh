@@ -1,19 +1,15 @@
 import torch
-from .dataset import Dataset
-from .transformer import device
+from transformer import *
+from constants import *
 
-def evaluate(transformer, english, english_mask, max_len):
-    """
-    Performs Greedy Decoding with a batch size of 1
-    """
+
+def evaluate(transformer, english, english_mask, max_len, processor):
     transformer.eval()
-    ds = Dataset()
-    processor = ds.get_processor()
     start_token = processor.bos_id()
     end_token = processor.eos_id()
     encoded = transformer.encode(english, english_mask)
     words = torch.LongTensor([[start_token]]).to(device)
-        
+    
     for step in range(max_len - 1):
         size = words.shape[1]
         target_mask = torch.triu(torch.ones(size, size)).transpose(0, 1).type(dtype=torch.uint8)
@@ -36,4 +32,3 @@ def evaluate(transformer, english, english_mask, max_len):
     sentence = processor.decode_ids(sen_idx)
     
     return sentence
-     

@@ -1,62 +1,80 @@
-# Python 3 server example
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import time
-from urllib.parse import urlparse, parse_qs
+import sys
+sys.path.insert(0, './src/')
 
-from src.dataset import Dataset
-from src.trainer import Trainer
+from flask import Flask, request, send_from_directory, redirect, render_template, flash, url_for, jsonify, \
+    make_response, abort
+
+from flask_cors import CORS, cross_origin
+
+#from src.trainer import Trainer
 from src.predictor import Predictor
 
-hostName = "localhost"
-serverPort = 8080
+app = Flask(__name__)
+app.config.from_object(__name__)  # load config from this file , flaskr.py
+cors = CORS(app)
+# Load default config and override config from an environment variable
+app.config.from_envvar('FLASKR_SETTINGS', silent=True)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['CORS_HEADERS'] = 'Content-Type'
+predictor = Predictor()
 
-class MyServer(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.get_params(self.path)
-        result = self.get_data(self.par_text)
-        self.wfile.write(bytes("<html><head><title>Translator Api</title></head>", "utf-8"))
-        self.wfile.write(bytes("<p>Request: %s</p>" % self.par_action, "utf-8"))
-        self.wfile.write(bytes("<p>Request: %s</p>" % self.par_text, "utf-8"))
-        self.wfile.write(bytes("<body>", "utf-8"))
-        self.wfile.write(bytes(f"<p>Translation is: {result}</p>", "utf-8"))
-        self.wfile.write(bytes("</body></html>", "utf-8"))
-
-    def get_params(self, path) :
-        url = urlparse(path)
-        params = parse_qs(url.query)
-        self.par_action = params['action'][0]
-        self.par_text = params['text'][0]
-
-    def get_data(self, text) : 
-            match self.par_action:
-                case "predict":
-                    pr = Predictor()
-                    while(1):
-                        if text == 'quit':
-                            break
-                        prediction = pr.predict(text)
-                        return prediction
-                case "train":
-                    tr = Trainer()
-                    tr.train()
-                case "create_dataset":
-                    ds = Dataset()
-                    ds.build()
-                case _:
-                    print("There is no such action")
+@app.route('/')
+@cross_origin()
+def home():
+    return render_template('home.html')
 
 
-if __name__ == "__main__":        
-    webServer = HTTPServer((hostName, serverPort), MyServer)
-    print("Server started http://%s:%s" % (hostName, serverPort))
+@app.route('/about')
+@cross_origin()
+def about():
+    return 'About Us'
 
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
 
-    webServer.server_close()
-    print("Server stopped.")
+@app.route('/predictor/get', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def translate_eng():
+    if request.method == "OPTIONS": # CORS preflight
+        return _build_cors_preflight_response()
+        
+    if request.method == 'POST':
+        if not request.json or 'text' not in request.json or 'level' not in request.json or 'target_lang' not in request.json:
+            abort(400)
+        text = request.json['text']
+        level = request.json['level']
+        target_lang = request.json['target_lang']
+    else:
+        text = request.args.get('text')
+        level = request.args.get('level')
+        target_lang = request.args.get('target_lang')
+
+    target_text = text
+    if level == 'char' and target_lang == 'french':
+        target_text = predictor.predict(text)
+        
+    return jsonify({
+        'sentence': text,
+        'translated': target_text,
+        'target_lang': target_lang,
+        'level': level
+    })
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({'error': 'Not found'}), 404)
+
+
+def main():
+    app.run(debug=True)
+
+
+def _build_cors_preflight_response():
+    response = make_response()
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add('Access-Control-Allow-Headers', "*")
+    response.headers.add('Access-Control-Allow-Methods', "*")
+    response.headers.add('Access-Control-Allow-Credentials', '*')
+    return response
+
+if __name__ == '__main__':
+    main()

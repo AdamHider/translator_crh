@@ -1,24 +1,40 @@
-from .config import get_conf, get_int
 import torch
-import pandas as pd
-from .dataset import Dataset
-from .transformer import FeedForward, Embeddings, EncoderLayer, DecoderLayer, MultiHeadAttention, Transformer, AdamWarmup, LossWithLS, device
-from .evaluate import evaluate
+import re
+from evaluate import evaluate
+from transformer import *
+from dataset import Dataset
+from constants import *
+#import nltk
+from nltk import tokenize
+#nltk.download('punkt')
 
 class Predictor :
-    
-    def __init__(self):
-        path = get_conf("path", "training")
+    def __init__(self) :
+        checkpoint = torch.load(f'{CKPT_DIR}/checkpoint_big_{num_epochs - 1}.pth.tar')
+        self.transformer = checkpoint['transformer']
 
-    def predict(self, input) : 
-        path = get_conf("path", "training")
-        epochs = get_int("training", "epochs")
-        checkpoint = torch.load(f"{path}/checkpoint_{str(epochs-1)}.pth.tar")
-        transformer = checkpoint['transformer']
+    def predict(self, input) :
+        sentences = self.sentence_split(input)
+        predictions = []
+        for sentence in sentences :
+            prediction = self.get_result(sentence)
+            predictions.append(prediction)
+        result = " ".join(predictions)
+        return result
 
+
+    def get_result(self, input): 
         ds = Dataset()
         processor = ds.get_processor()
-        english = ds.encode_source(input, processor)
-        english = torch.LongTensor(english).to(device).unsqueeze(0)
-        english_mask = (english!=0).to(device).unsqueeze(1).unsqueeze(1)  
-        return evaluate(transformer, english, english_mask, int(40))
+        input = ds.encode_source(input, processor)
+        input = torch.LongTensor(input).to(device).unsqueeze(0)
+        input_mask = (input!=0).to(device).unsqueeze(1).unsqueeze(1)  
+        prediction = evaluate(self.transformer, input, input_mask, int(40), processor)
+        return self.process_prediction(prediction)
+
+    def process_prediction(self, prediction) :
+        result = re.sub(r' ([!.?,])', r'\1', prediction)
+        return result
+
+    def sentence_split(self, text) :
+        return tokenize.sent_tokenize(text)

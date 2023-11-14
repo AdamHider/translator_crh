@@ -1,69 +1,68 @@
-from .config import get_conf, get_int
-import os
+
+
 import pandas as pd
 import random
 from sentencepiece import SentencePieceTrainer, SentencePieceProcessor
+from constants import *
 
-class Dataset : 
-    def __init__(self):
-        path = get_conf("path", "dataset")
-        self.model = f'{path}/{get_conf("dataset", "model_name")}'
-        self.input_file = f'{path}/{get_conf("dataset", "input_filename")}'
-        self.temp_file = f'{path}/{get_conf("dataset", "temp_filename")}'
-        self.build_file = f'{path}/{get_conf("dataset", "final_filename")}'
-        self.max_len = get_int("dataset", "max_len")
-
-    def preload(self):
+class Dataset :
+    def preload(self) :
         random.seed(42)
-        df = pd.read_csv(self.input_file, header = None, chunksize = 500000)
-        df = next(df)
-        df[0] = df[0].astype('str')
-        df[1] = df[1].astype('str')
-        tmp_dataset = list(df[0] + df[1])
-        with open(self.temp_file, "w", encoding = "utf-8") as output:
-            output.write(str(("\n").join(tmp_dataset)))
-        return df
+        dff = pd.read_csv(SRC_FILE, chunksize=500000)
+        df = next(dff)
+        df = df.rename(columns={'Source words/sentences':'source','Target words/sentences':'target'})
+        df.sample(10)
+        df['source'] = df['source'].astype('str')
+        df['target'] = df['target'].astype('str')
+        sample_text = list(df['source'] + df['target'])
+        with open(f'{DATA_DIR}/{input_file}', "w", encoding="utf-8") as output:
+            output.write(str(("\n").join(sample_text)))
 
-    def train(self):
+        return df    
+
+    #=============================================
+
+
+    def train(self) :
         sentencepiece_params = ' '.join([
-            '--input={}'.format(self.temp_file),
-            '--model_type={}'.format("bpe"),
-            '--model_prefix={}'.format(self.model),
-            '--vocab_size={}'.format(10000),
-            '--pad_id={}'.format(0),
-            '--unk_id={}'.format(1),
-            '--bos_id={}'.format(2),
-            '--eos_id={}'.format(3)
+            '--input={}'.format(f'{DATA_DIR}/{input_file}'),
+            '--model_type={}'.format(model_type),
+            '--model_prefix={}'.format(f'{SP_DIR}/{model_prefix}'),
+            '--vocab_size={}'.format(sp_vocab_size),
+            '--pad_id={}'.format(pad_id),
+            '--unk_id={}'.format(unk_id),
+            '--bos_id={}'.format(bos_id),
+            '--eos_id={}'.format(eos_id)
         ])
         print(sentencepiece_params)
         SentencePieceTrainer.train(sentencepiece_params)
-        #os.remove(self.temp_file)
 
+    #=============================================
     def get_processor(self) :
-        processor = SentencePieceProcessor()
-        processor.bos_token = ''
-        processor.eos_token = ''
-        processor.pad_token = ''
-        processor.unk_token = ''
-        processor.load(f"{self.model}.model")
-        return processor
-
-    def get_vocab_size(self) :
-        return self.get_processor().vocab_size()
+        sp = SentencePieceProcessor()
+        sp.bos_token = ''
+        sp.eos_token = ''
+        sp.pad_token = ''
+        sp.unk_token = ''
+        sp.load(f"{SP_DIR}/{model_prefix}.model")
+        return sp
 
     def encode_source(self, text, sp_processor):
         byte_pairs = sp_processor.encode_as_ids(text)
-        enc_c = [sp_processor.bos_id()] + list(byte_pairs) + [sp_processor.pad_id()] * (self.max_len - len(list(byte_pairs)))
-        return enc_c[:self.max_len]
+        enc_c = [sp_processor.bos_id()] + list(byte_pairs) + [sp_processor.pad_id()] * (seq_max_len - len(list(byte_pairs)))
+        return enc_c[:seq_max_len]
 
     def encode_target(self, text, sp_processor):
         byte_pairs = sp_processor.encode_as_ids(text)
-        enc_c = [sp_processor.bos_id()] + list(byte_pairs) + [sp_processor.eos_id()] + [sp_processor.pad_id()] * (self.max_len - len(list(byte_pairs)))
-        return enc_c[:self.max_len]
+        enc_c = [sp_processor.bos_id()] + list(byte_pairs) + [sp_processor.eos_id()] + [sp_processor.pad_id()] * (seq_max_len - len(list(byte_pairs)))
+        return enc_c[:seq_max_len]
 
-    def build(self) : 
+
+    def build(self) :
         df = self.preload()
+        df.tail()
+        df_f = df.sample(frac = 1)
+        df_f.head()
+        df_f.to_csv(f'{DATA_DIR}/{COMPILED_FILE}')
         self.train()
-        df.to_csv(self.build_file)
-
-    
+     

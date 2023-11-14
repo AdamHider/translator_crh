@@ -1,15 +1,15 @@
+
+import math
 import torch
 import torch.nn as nn
-import math
+import torch.optim as optim
 import torch.nn.functional as F
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import math
+from torch.utils.data import TensorDataset, DataLoader, Dataset
+from constants import *
 
 class Embeddings(nn.Module):
-    """
-    Initializes embeddings
-    Adds positional encoding
-    """
+
     def __init__(self, vocab_size, d_model, max_len = 50):
         super(Embeddings, self).__init__()
         self.d_model = d_model  ## This is basically how deep the model is, so the embeddings are going to be 512 numbers for each word.
@@ -34,10 +34,7 @@ class Embeddings(nn.Module):
      
 
 class MultiHeadAttention(nn.Module):
-    '''
-    Runs Embeddings through linear layer to create query, keys, and values
-    Divides q,k,v by heads
-    '''
+
     def __init__(self, heads, d_model):
         
         super(MultiHeadAttention, self).__init__()
@@ -51,10 +48,6 @@ class MultiHeadAttention(nn.Module):
         self.concat = nn.Linear(d_model, d_model)
         
     def forward(self, query, key, value, mask):
-        """
-        query, key, value of shape: (batch_size, max_len, 512)
-        mask of shape: (batch_size, 1, 1, max_words)
-        """
         # (batch_size, max_len, 512)
         query = self.query(query)
         key = self.key(key)        
@@ -81,7 +74,7 @@ class MultiHeadAttention(nn.Module):
      
 
 class FeedForward(nn.Module):
-    
+
     def __init__(self, d_model, middle_dim = 2048):
         super(FeedForward, self).__init__()
         
@@ -96,7 +89,7 @@ class FeedForward(nn.Module):
      
 
 class EncoderLayer(nn.Module):
-    
+
     def __init__(self, d_model, heads):
         super(EncoderLayer, self).__init__()
         self.layernorm = nn.LayerNorm(d_model)
@@ -135,10 +128,11 @@ class DecoderLayer(nn.Module):
 
 class Transformer(nn.Module):
     
-    def __init__(self, d_model, heads, num_layers, vocab_size):
+    def __init__(self, d_model, heads, num_layers):
         super(Transformer, self).__init__()
+        
         self.d_model = d_model
-        self.vocab_size = vocab_size
+        self.vocab_size = 10000
         self.embed = Embeddings(self.vocab_size, d_model)
         self.encoder = nn.ModuleList([EncoderLayer(d_model, heads) for _ in range(num_layers)])
         self.decoder = nn.ModuleList([DecoderLayer(d_model, heads) for _ in range(num_layers)])
@@ -166,6 +160,7 @@ class Transformer(nn.Module):
 class AdamWarmup:
     
     def __init__(self, model_size, warmup_steps, optimizer):
+        
         self.model_size = model_size
         self.warmup_steps = warmup_steps
         self.optimizer = optimizer
@@ -190,16 +185,12 @@ class LossWithLS(nn.Module):
 
     def __init__(self, size, smooth):
         super(LossWithLS, self).__init__()
-        self.criterion = nn.KLDivLoss(reduction='none')
+        self.criterion = nn.KLDivLoss(size_average=False, reduce=False)
         self.confidence = 1.0 - smooth
         self.smooth = smooth
         self.size = size
         
     def forward(self, prediction, target, mask):
-        """
-        prediction of shape: (batch_size, max_words, vocab_size)
-        target and mask of shape: (batch_size, max_words)
-        """
         prediction = prediction.view(-1, prediction.size(-1))   # (batch_size * max_words, vocab_size)
         target = target.contiguous().view(-1)   # (batch_size * max_words)
         mask = mask.float()
@@ -210,15 +201,3 @@ class LossWithLS(nn.Module):
         loss = self.criterion(prediction, labels)    # (batch_size * max_words, vocab_size)
         loss = (loss.sum(1) * mask).sum() / mask.sum()
         return loss
-
-
-class TransformerBuilder: 
-    def __init__(self, d_model, heads, num_layers, vocab_size):
-        self.transformer = Transformer(d_model = d_model, heads = heads, num_layers = num_layers, vocab_size = vocab_size)
-        self.transformer = self.transformer.to(device)
-        self.adam_optimizer = torch.optim.Adam(self.transformer.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9)
-        self.transformer_optimizer = AdamWarmup(model_size = d_model, warmup_steps = 4000, optimizer = self.adam_optimizer)
-        self.criterion = LossWithLS(vocab_size, 0.1)
-        
-    def export (self) :
-        return self.transformer, self.transformer_optimizer, self.criterion
